@@ -18,11 +18,13 @@ class SkillUnit(object):
                  oper_dispatcher_client: OperDispatcherClient,
                  db_buffer_client: DbBufferClient,
                  call_direct_clients: list[CallDirectClient],
+                 sqlite_connection,
                  skill_id: int):
         self.config: Config = config
         self.oper_dispatcher_client: OperDispatcherClient = oper_dispatcher_client
         self.db_buffer_client: DbBufferClient = db_buffer_client
         self.call_direct_clients: list[CallDirectClient] = call_direct_clients
+        self.sqlite_connection = sqlite_connection
         self.skill_id: int = skill_id
         self.active: bool = False
         self.current_all: int = 0
@@ -48,6 +50,12 @@ class SkillUnit(object):
         self.current_busy = new_busy
         self.current_wait = new_wait
         self.current_power = new_power
+
+        cursor = self.sqlite_connection.cursor()
+        cursor.execute('INSERT INTO skill_chart (skill_id, calc_time, cnt_online, cnt_busy, cnt_wait_oper, power) '
+                       'VALUES (?, ?, ?, ?, ?, ?)',
+                       (self.skill_id, datetime.now().isoformat(), new_online, new_busy, new_wait, new_power))
+        self.sqlite_connection.commit()
 
         return self.current_busy + self.current_wait
 
@@ -84,11 +92,14 @@ class SkillUnit(object):
             power = int(pid(self.current_busy + self.current_wait))
 
             skill_detail = await self.oper_dispatcher_client.get_skill_details(skill_id=self.skill_id)
-            self.update_detail(new_all=skill_detail.get('all'),
-                               new_online=skill_detail.get('online'),
-                               new_busy=skill_detail.get('busy'),
-                               new_wait=skill_detail.get('wait'),
-                               new_power=power)
+            if skill_detail:
+                self.update_detail(new_all=skill_detail.get('all'),
+                                   new_online=skill_detail.get('online'),
+                                   new_busy=skill_detail.get('busy'),
+                                   new_wait=skill_detail.get('wait'),
+                                   new_power=power)
+            else:
+                self.log.warning(f'skill_detail={skill_detail}')
 
             pid.setpoint = self.current_online
 
@@ -98,3 +109,5 @@ class SkillUnit(object):
                     delay = round(random.uniform(0, self.update_time), 3)
                     call_direct_client: CallDirectClient = random.choice(self.call_direct_clients)
                     asyncio.create_task(call_direct_client.start_call(lead=lead, delay=delay))
+            else:
+                self.log.warning(f'leads={leads}')

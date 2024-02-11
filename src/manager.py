@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sqlite3
 
 from loguru import logger
 
@@ -20,6 +21,7 @@ class Manager(object):
         self.call_direct_clients: list[CallDirectClient] = []
         self.log = logger.bind(object_id=self.__class__.__name__)
         self.skill_units: dict[int, SkillUnit] = {}
+        self.sqlite_connection = sqlite3.connect('chart_database.db', check_same_thread=False)
 
     def __del__(self):
         self.log.debug('object has died')
@@ -27,6 +29,7 @@ class Manager(object):
     async def close_session(self):
         if self.config.alive:
             self.log.info('start close_session')
+            self.sqlite_connection.close()
             await self.oper_dispatcher_client.close_session()
             await self.db_buffer_client.close_session()
             for call_direct_client in self.call_direct_clients:
@@ -64,6 +67,23 @@ class Manager(object):
         self.log.info('start_manager')
         asyncio.create_task(self.alive_report())
 
+        cursor = self.sqlite_connection.cursor()
+
+        # cursor.execute('DROP TABLE skill_chart;')
+
+        # Создаем таблицу Users
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS skill_chart (
+        skill_id INTEGER NOT NULL,
+        calc_time TEXT NOT NULL,
+        cnt_online INTEGER NOT NULL,
+        cnt_busy INTEGER NOT NULL,
+        cnt_wait_oper INTEGER NOT NULL,
+        power INTEGER
+        )
+        ''')
+        self.sqlite_connection.commit()
+
         for call_direct_address in self.config.call_direct_addresses:
             self.call_direct_clients.append(CallDirectClient(config=self.config,
                                                              api_url=call_direct_address))
@@ -80,6 +100,7 @@ class Manager(object):
                                                oper_dispatcher_client=self.oper_dispatcher_client,
                                                db_buffer_client=self.db_buffer_client,
                                                call_direct_clients=self.call_direct_clients,
+                                               sqlite_connection=self.sqlite_connection,
                                                skill_id=skill_id)
                         self.skill_units[skill_id] = skill_unit
                         skill_unit.switch_active(active=True)
@@ -102,3 +123,13 @@ class Manager(object):
         self.config.alive = False
         current_pid = os.getpid()
         os.kill(current_pid, 9)
+
+    def select_skill_chart(self, skill_id: int, batch_size: int) -> list:
+        cursor = self.sqlite_connection.cursor()
+
+        cursor.execute('SELECT calc_time, cnt_online, cnt_busy, cnt_wait_oper, power '
+                       'FROM skill_chart '
+                       'WHERE skill_id = ? '
+                       'LIMIT ?', (skill_id, batch_size))
+        skill_chart = cursor.fetchall()
+        return skill_chart
