@@ -1,0 +1,2 @@
+simple-pid==2.0.0
+plotext==5.2.8
