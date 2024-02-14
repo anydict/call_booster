@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter
 from loguru import logger
 from pydantic import BaseModel
@@ -23,12 +25,11 @@ class Routers(object):
         self.manager: Manager = manager
         self.log = logger.bind(object_id=self.__class__.__name__)
 
-        self.router = APIRouter(
-            tags=["ALL"],
-            responses={404: {"description": "Not found"}},
-        )
+        self.router = APIRouter(tags=["ALL"])
+
         self.router.add_api_route(path="/", endpoint=self.get_root, methods=["GET"], tags=["Common"])
         self.router.add_api_route(path="/diag", endpoint=self.get_diag, methods=["GET"], tags=["Common"])
+        self.router.add_api_route(path="/stats", endpoint=self.get_stats, methods=["GET"], tags=["Common"])
         self.router.add_api_route(path="/restart", endpoint=self.restart, methods=["POST"], tags=["Common"])
 
         self.router.add_api_route(path="/skill/chart/{skill_id}", endpoint=self.get_skill_chart,
@@ -43,9 +44,21 @@ class Routers(object):
 
     def get_diag(self):
         return JSONResponse(content={
+            "status": "ok",
+            "app": self.config.app
+        })
+
+    def get_stats(self):
+        return JSONResponse(content={
+            "status": "ok",
             "app": self.config.app,
-            "wait_shutdown": self.config.wait_shutdown,
-            "alive": self.config.alive,
+            "app_api_host": self.config.app_api_host,
+            "app_api_port": self.config.app_api_port,
+            "app_version": self.config.app_version,
+            "python_version": self.config.python_version,
+            "uptime": self.config.uptime.isoformat(),
+            "current_time": datetime.now().isoformat(),
+            "alive": self.config.alive
         })
 
     def restart(self):
@@ -63,13 +76,16 @@ class Routers(object):
     def get_skill_chart(self, skill_id: int, batch_size: int = 100):
         batch_size = batch_size if batch_size < 9999 else 9999
 
-        skill_chart = self.manager.select_skill_chart(skill_id, batch_size)
+        cursor = self.manager.sqlite_connection.cursor()
 
-        labels = []
-        dataset1 = []
-        dataset2 = []
-        dataset3 = []
-        dataset4 = []
+        cursor.execute('SELECT calc_time, cnt_online, cnt_busy, cnt_wait_oper, power '
+                       'FROM skill_chart '
+                       'WHERE skill_id = ? '
+                       'LIMIT ?', (skill_id, batch_size))
+        skill_chart = cursor.fetchall()
+
+        labels, dataset1, dataset2, dataset3, dataset4 = [], [], [], [], []
+
         for row in skill_chart:
             labels.append(row[0])
             dataset1.append(row[1])

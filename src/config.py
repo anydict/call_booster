@@ -1,6 +1,7 @@
 import json
 import os
 import platform
+from datetime import datetime
 
 
 def filter_error_log(record):
@@ -48,10 +49,11 @@ class Config(object):
                           "<cyan>{line}</cyan> - <level>{message}</level>"
 
         self.join_config: dict = join_config
-        self.app_version = self.get_app_version()
-        self.python_version = platform.python_version()
+        self.app_version: str = self.get_app_version()
+        self.python_version: str = platform.python_version()
+        self.uptime: datetime = datetime.now()
 
-        self.new_config = self.default.copy()
+        self.new_config: dict = self.default.copy()
         self.new_config.update(join_config)
         self.alive: bool = bool(self.new_config['alive'])  # if true then start kill FastAPI and APP
         self.wait_shutdown: bool = bool(self.new_config['wait_shutdown'])  # if true then waiting for finish all tasks

@@ -1,23 +1,23 @@
 from datetime import datetime
 
+from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from loguru import logger
-from fastapi import Request
-from starlette import status
 from starlette.responses import JSONResponse
+from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY, HTTP_404_NOT_FOUND
 
 
 async def logging_dependency(request: Request):
     body_content = await request.body()
     body_content = body_content if len(body_content) < 1000 else f'len={len(body_content)}'
-    
-    logger.debug(f"{request.method} {request.url} body: {body_content} "
+
+    logger.debug(f"{request.method} {request.url} body_content: {body_content} "
                  f"Params: {request.path_params.items()} "
                  f"Headers: {request.headers.items()}")
 
 
-async def custom_validation_exception_handler(request: Request,
-                                              exc: RequestValidationError):
+async def custom_request_validation_exception_handler(request: Request,
+                                                      exc: RequestValidationError):
     """
     logging validation error
 
@@ -26,18 +26,18 @@ async def custom_validation_exception_handler(request: Request,
     """
     errors = ['ValidationError']
     for error in exc.errors():
-        errors.append({
-            'loc': error['loc'],
-            'msg': error['msg'],
-            'type': error['type']
-        })
-    logger.error(f"ValidationError in path: {request.url.path} request_body: {await request.body()}")
-    logger.error(f"ValidationError detail: {errors}")
-    logger.error(f"ValidationError client_info: {request.client}")
-    logger.error(request.headers)
+        errors.append(f"loc: {error.get('loc')}; msg: {error.get('msg')}; type: {error.get('type')}")
+    request_body = await request.body()
+    request_body = request_body if len(str(request_body)) < 500 else f'len=({len(request_body)}'
+    logger.error(f"ValidationError detail:"
+                 f">>path: {request.url.path} "
+                 f">>request_body: {request_body} "
+                 f">>client_info: {request.client} "
+                 f">>client_headers: {request.headers} "
+                 f">>errors: {errors}")
 
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=HTTP_422_UNPROCESSABLE_ENTITY,
         content={"status": "error", "msg": " ### ".join(errors)}
     )
 
@@ -49,7 +49,7 @@ async def custom_404_handler(request: Request, __):
         "status": "error",
         "msg": msg
     }
-    return JSONResponse(content=response, status_code=404)
+    return JSONResponse(content=response, status_code=HTTP_404_NOT_FOUND)
 
 
 async def add_process_time_header(request: Request, call_next):

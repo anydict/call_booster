@@ -10,7 +10,7 @@ from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 
-from src.api.api_utils import (custom_validation_exception_handler,
+from src.api.api_utils import (custom_request_validation_exception_handler,
                                custom_404_handler,
                                add_process_time_header,
                                logging_dependency)
@@ -62,7 +62,7 @@ if __name__ == "__main__":
         logger = logger.bind(object_id=os.path.basename(__file__))
 
         exception_handlers = {
-            RequestValidationError: custom_validation_exception_handler,
+            RequestValidationError: custom_request_validation_exception_handler,
             404: custom_404_handler
         }
 

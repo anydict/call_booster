@@ -12,7 +12,7 @@ from src.skill_unit import SkillUnit
 
 
 class Manager(object):
-    """He runs calls and send messages in rooms"""
+    """He runs and controls other tasks and functions"""
 
     def __init__(self, config: Config):
         self.config: Config = config
@@ -123,13 +123,3 @@ class Manager(object):
         self.config.alive = False
         current_pid = os.getpid()
         os.kill(current_pid, 9)
-
-    def select_skill_chart(self, skill_id: int, batch_size: int) -> list:
-        cursor = self.sqlite_connection.cursor()
-
-        cursor.execute('SELECT calc_time, cnt_online, cnt_busy, cnt_wait_oper, power '
-                       'FROM skill_chart '
-                       'WHERE skill_id = ? '
-                       'LIMIT ?', (skill_id, batch_size))
-        skill_chart = cursor.fetchall()
-        return skill_chart

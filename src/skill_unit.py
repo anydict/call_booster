@@ -32,32 +32,30 @@ class SkillUnit(object):
         self.current_busy: int = 0
         self.current_wait: int = 0
         self.current_power: int = 0
+        self.wanted_ratio: float = 0.99
+        self.kp: float = 0.0
+        self.ki: float = 0.0
+        self.kd: float = 0.0
         self.update_time: int = 5
         self.start_time = datetime.now()
         self.last_time = datetime.now()
+        self.pid = PID(self.kp, self.ki, self.kd, setpoint=self.current_online)
+
         self.log = logger.bind(object_id=f'{self.__class__.__name__}-{skill_id}')
 
-    def update_detail(self,
-                      new_all: int,
-                      new_online: int,
-                      new_busy: int,
-                      new_wait: int,
-                      new_power: int) -> int:
-        self.log.info(f'new_all={new_all} new_online={new_online} new_busy={new_busy} '
-                      f'new_wait={new_wait} new_power={new_power}')
-        self.current_all = new_all
-        self.current_online = new_online
-        self.current_busy = new_busy
-        self.current_wait = new_wait
-        self.current_power = new_power
-
-        cursor = self.sqlite_connection.cursor()
-        cursor.execute('INSERT INTO skill_chart (skill_id, calc_time, cnt_online, cnt_busy, cnt_wait_oper, power) '
-                       'VALUES (?, ?, ?, ?, ?, ?)',
-                       (self.skill_id, datetime.now().isoformat(), new_online, new_busy, new_wait, new_power))
-        self.sqlite_connection.commit()
-
-        return self.current_busy + self.current_wait
+    def new_row_skill_chart(self) -> None:
+        """Add new row in skill_chart"""
+        try:
+            cursor = self.sqlite_connection.cursor()
+            cursor.execute(' INSERT INTO skill_chart '
+                           ' (skill_id, calc_time, cnt_online, cnt_busy, '
+                           '  cnt_wait_oper, power) '
+                           ' VALUES (?, ?, ?, ?, ?, ?)',
+                           (self.skill_id, datetime.now().isoformat(), self.current_online, self.current_busy,
+                            self.current_wait, self.current_power))
+            self.sqlite_connection.commit()
+        except Exception as e:
+            self.log.warning(e)
 
     def switch_active(self, active: bool):
         if self.active != active:
@@ -68,40 +66,69 @@ class SkillUnit(object):
         if self.current_power <= 0:
             return []
 
+        batch_size = int(self.current_power * self.update_time)
+
         while self.config.wait_shutdown is False:
-            leads = await self.db_buffer_client.get_leads(batch_size=self.current_power,
+            leads = await self.db_buffer_client.get_leads(batch_size=batch_size,
                                                           skill_id=self.skill_id)
             if leads:
                 return leads
             else:
                 self.log.debug(f'not found lead for skill_id={self.skill_id}')
+                self.pid.reset()
+                self.current_power = 0
                 await asyncio.sleep(self.update_time)
+
+    async def background_refresh_pid_params(self):
+        while self.config.wait_shutdown is False:
+            await asyncio.sleep(5)
+            # await new_pid_params = http_get_request(blabla)
+            self.pid.tunings = (1, 0.01, 0.01)
+            self.pid.output_limits = (0, 200)
+            self.wanted_ratio: float = 0.99
+            self.update_time: int = 5
+
+    async def background_refresh_oper_stats(self):
+        while self.config.wait_shutdown is False:
+            await asyncio.sleep(5)
+            skill_detail = await self.oper_dispatcher_client.get_skill_details(skill_id=self.skill_id)
+            self.current_all = skill_detail.get('all', 0)
+            self.current_online = skill_detail.get('online', 0)
+            self.current_busy = skill_detail.get('busy', 0)
+            self.current_wait = skill_detail.get('wait', 0)
+            self.log.info(f'skill_detail={skill_detail} power={self.current_power}')
+            self.new_row_skill_chart()
 
     async def start_booster(self):
         """Booster for start_call"""
-        pid = PID(5, 0.01, 0.1, setpoint=self.current_online)
-        pid.output_limits = (0, 200)
+
+        asyncio.create_task(self.background_refresh_pid_params())
+        asyncio.create_task(self.background_refresh_oper_stats())
+
+        self.pid.output_limits = (0, 200)
 
         while self.config.wait_shutdown is False:
             if self.active:
                 await asyncio.sleep(self.update_time)
+                self.pid.reset()
+                self.current_power = 0
             else:
                 await asyncio.sleep(1)
                 continue
 
-            power = int(pid(self.current_busy + self.current_wait))
-
             skill_detail = await self.oper_dispatcher_client.get_skill_details(skill_id=self.skill_id)
-            if skill_detail:
-                self.update_detail(new_all=skill_detail.get('all'),
-                                   new_online=skill_detail.get('online'),
-                                   new_busy=skill_detail.get('busy'),
-                                   new_wait=skill_detail.get('wait'),
-                                   new_power=power)
-            else:
-                self.log.warning(f'skill_detail={skill_detail}')
 
-            pid.setpoint = self.current_online
+            self.current_power = int(self.pid(self.current_busy + self.current_wait))
+
+            self.current_all = skill_detail.get('all', 0)
+            self.current_online = skill_detail.get('online', 0)
+            self.current_busy = skill_detail.get('busy', 0)
+            self.current_wait = skill_detail.get('wait', 0)
+
+            self.log.info(f'skill_detail={skill_detail} power={self.current_power}')
+            self.new_row_skill_chart()
+
+            self.pid.setpoint = int(self.current_online * self.wanted_ratio)
 
             leads = await self.get_leads()
             if leads:
