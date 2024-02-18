@@ -10,27 +10,23 @@ class DemoCall(object):
     def __init__(self,
                  config: Config,
                  skill_id: int,
-                 lead_id: int,
-                 call_id: str,
-                 ring_duration: float,
-                 ivr_duration: float,
-                 redirect_duration: float,
-                 answer_percent: float,
-                 redirect_percent: float
-                 ):
+                 call_id: int,
+                 date_call: datetime,
+                 date_answer: datetime,
+                 redirect_search: datetime,
+                 redirect_call: datetime,
+                 redirect_answer: datetime,
+                 date_end: datetime):
         self.config: Config = config
         self.skill_id: int = skill_id
-        self.lead_id: int = lead_id
-        self.call_id: str = call_id
-        self.ring_duration: float = ring_duration
-        self.ivr_duration: float = ivr_duration
-        self.redirect_duration: float = redirect_duration
-        self.answer_percent: float = answer_percent
-        self.redirect_percent: float = redirect_percent
-        self.date_call: datetime = datetime.now()
-        self.date_answer: Optional[datetime] = None
-        self.date_end: Optional[datetime] = None
+        self.call_id: int = call_id
+
+        self.date_call: datetime = date_call
+        self.date_answer: datetime = date_answer
+        self.redirect_search: datetime = redirect_search
+        self.redirect_call: datetime = redirect_call
+        self.redirect_answer: datetime = redirect_answer
+        self.date_end: datetime = date_end
+
         self.oper_id: Optional[int] = None
-        self.redirect_call: Optional[datetime] = None
-        self.redirect_answer: Optional[datetime] = None
-        self.log = logger.bind(object_id=f'{self.__class__.__name__}-{lead_id}')
+        self.log = logger.bind(object_id=f'{self.__class__.__name__}-{call_id}')

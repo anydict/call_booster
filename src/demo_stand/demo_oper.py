@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from loguru import logger
@@ -16,7 +17,8 @@ class DemoOper(object):
         self.skill_id: int = skill_id
         self.oper_id: int = oper_id
         self.rest_time: int = rest_time
-        self.call_id: Optional[str] = None
-        self.lead_id: Optional[int] = None
+        self.call_id: Optional[int] = None
+        self.date_end: Optional[datetime] = None
+        self.rest_end: Optional[datetime] = None
 
         self.log = logger.bind(object_id=f'{self.__class__.__name__}-{oper_id}')
