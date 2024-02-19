@@ -23,6 +23,7 @@ class Config(object):
         "oper_dispatcher_port": 8090,
         "db_buffer_host": "127.0.0.1",
         "db_buffer_port": 7005,
+        "demo_log": True,
         "call_direct_addresses": [
             "127.0.0.1:8200",
             "127.0.0.1:8201"
@@ -70,6 +71,8 @@ class Config(object):
 
         self.db_buffer_host: str = str(self.new_config['db_buffer_host'])
         self.db_buffer_port: int = int(self.new_config['db_buffer_port'])
+
+        self.demo_log: list = bool(self.new_config['demo_log'])
 
         self.call_direct_addresses: list = list(self.new_config['call_direct_addresses'])
 

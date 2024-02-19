@@ -8,7 +8,7 @@ import pandas
 #     row = f"kp;ki;kd;update_time;count_raw_call;hotline_counter;occupy_counter\n"
 #     txt_file.write(row)
 
-con = sqlite3.connect("demo_stand_database5.db")
+con = sqlite3.connect("demo_stand_database_avg_busy2.db")
 cur = con.cursor()
 # cur.execute("CREATE TABLE stat_params (kp, ki, kd, update_time, count_raw_call, hotline_counter, occupy_counter);")
 
