@@ -21,7 +21,7 @@ class Manager(object):
         self.call_direct_clients: list[CallDirectClient] = []
         self.log = logger.bind(object_id=self.__class__.__name__)
         self.skill_units: dict[int, SkillUnit] = {}
-        self.sqlite_connection = sqlite3.connect('chart_database.db', check_same_thread=False)
+        self.sqlite_connector = sqlite3.connect('chart_database.db', check_same_thread=False)
 
     def __del__(self):
         self.log.debug('object has died')
@@ -29,7 +29,7 @@ class Manager(object):
     async def close_session(self):
         if self.config.alive:
             self.log.info('start close_session')
-            self.sqlite_connection.close()
+            self.sqlite_connector.close()
             await self.oper_dispatcher_client.close_session()
             await self.db_buffer_client.close_session()
             for call_direct_client in self.call_direct_clients:
@@ -67,7 +67,7 @@ class Manager(object):
         self.log.info('start_manager')
         asyncio.create_task(self.alive_report())
 
-        cursor = self.sqlite_connection.cursor()
+        cursor = self.sqlite_connector.cursor()
 
         # cursor.execute('DROP TABLE skill_chart;')
 
@@ -82,7 +82,7 @@ class Manager(object):
         power INTEGER
         )
         ''')
-        self.sqlite_connection.commit()
+        self.sqlite_connector.commit()
 
         for call_direct_address in self.config.call_direct_addresses:
             self.call_direct_clients.append(CallDirectClient(config=self.config,
@@ -100,7 +100,7 @@ class Manager(object):
                                                oper_dispatcher_client=self.oper_dispatcher_client,
                                                db_buffer_client=self.db_buffer_client,
                                                call_direct_clients=self.call_direct_clients,
-                                               sqlite_connection=self.sqlite_connection,
+                                               sqlite_connector=self.sqlite_connector,
                                                skill_id=skill_id)
                         self.skill_units[skill_id] = skill_unit
                         skill_unit.switch_active(active=True)

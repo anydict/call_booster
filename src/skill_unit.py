@@ -1,5 +1,6 @@
 import asyncio
 import random
+import sqlite3
 from datetime import datetime
 
 from loguru import logger
@@ -15,17 +16,17 @@ from src.http_clients.oper_dispatcher_client import OperDispatcherClient
 class SkillUnit(object):
     def __init__(self,
                  config: Config,
+                 skill_id: int,
+                 sqlite_connector: sqlite3.Connection,
                  oper_dispatcher_client: OperDispatcherClient,
-                 db_buffer_client: DbBufferClient,
                  call_direct_clients: list[CallDirectClient],
-                 sqlite_connection,
-                 skill_id: int):
+                 db_buffer_client: DbBufferClient):
         self.config: Config = config
-        self.oper_dispatcher_client: OperDispatcherClient = oper_dispatcher_client
-        self.db_buffer_client: DbBufferClient = db_buffer_client
-        self.call_direct_clients: list[CallDirectClient] = call_direct_clients
-        self.sqlite_connection = sqlite_connection
         self.skill_id: int = skill_id
+        self.sqlite_connector: sqlite3.Connection = sqlite_connector
+        self.oper_dispatcher_client: OperDispatcherClient = oper_dispatcher_client
+        self.call_direct_clients: list[CallDirectClient] = call_direct_clients
+        self.db_buffer_client: DbBufferClient = db_buffer_client
         self.active: bool = False
         self.current_all: int = 0
         self.current_online: int = 0
@@ -46,14 +47,14 @@ class SkillUnit(object):
     def new_row_skill_chart(self) -> None:
         """Add new row in skill_chart"""
         try:
-            cursor = self.sqlite_connection.cursor()
+            cursor = self.sqlite_connector.cursor()
             cursor.execute(' INSERT INTO skill_chart '
                            ' (skill_id, calc_time, cnt_online, cnt_busy, '
                            '  cnt_wait_oper, power) '
                            ' VALUES (?, ?, ?, ?, ?, ?)',
                            (self.skill_id, datetime.now().isoformat(), self.current_online, self.current_busy,
                             self.current_wait, self.current_power))
-            self.sqlite_connection.commit()
+            self.sqlite_connector.commit()
         except Exception as e:
             self.log.warning(e)
 

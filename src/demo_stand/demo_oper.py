@@ -17,8 +17,7 @@ class DemoOper(object):
         self.skill_id: int = skill_id
         self.oper_id: int = oper_id
         self.rest_time: int = rest_time
+        self.rest_end: datetime = datetime(2010, 1, 1)
         self.call_id: Optional[int] = None
-        self.date_end: Optional[datetime] = None
-        self.rest_end: Optional[datetime] = None
 
         self.log = logger.bind(object_id=f'{self.__class__.__name__}-{oper_id}')

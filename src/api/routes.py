@@ -76,7 +76,7 @@ class Routers(object):
     def get_skill_chart(self, skill_id: int, batch_size: int = 100):
         batch_size = batch_size if batch_size < 9999 else 9999
 
-        cursor = self.manager.sqlite_connection.cursor()
+        cursor = self.manager.sqlite_connector.cursor()
 
         cursor.execute('SELECT calc_time, cnt_online, cnt_busy, cnt_wait_oper, power '
                        'FROM skill_chart '
